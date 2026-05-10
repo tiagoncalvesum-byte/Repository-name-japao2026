@@ -260,7 +260,56 @@ textarea{resize:vertical;min-height:44px;}
 
 .item-time{min-width:52px;padding-top:2px;}
 .item-time input{width:52px;padding:2px 5px;font-size:.56rem;border:1px solid var(--border);border-radius:2px;background:transparent;font-family:'Space Mono',monospace;color:var(--muted);text-align:center;}
-.del-btn:hover{background:#fee2e2 !important;border-color:#fca5a5 !important;color:var(--red) !important;}
+.del-btn:hover{
+  background:#fee2e2 !important;
+}
+
+@media (max-width: 768px){
+
+  body{
+    font-size:16px;
+  }
+
+  .ov-grid,
+  .day-body,
+  .planner-layout,
+  .flight-grid{
+    display:block !important;
+  }
+
+  .ov-right,
+  .schedule-col,
+  .add-panel,
+  .day-sidebar{
+    width:100% !important;
+    border:none !important;
+  }
+
+  .spots-grid{
+    grid-template-columns:1fr !important;
+  }
+
+  .stats-bar{
+    grid-template-columns:repeat(2,1fr) !important;
+  }
+
+  .hero-names{
+    font-size:2rem !important;
+  }
+
+  .btn{
+    min-height:44px;
+  }
+
+  input,
+  select,
+  textarea{
+    min-height:44px;
+    font-size:16px !important;
+  }
+
+}
+
 </style>
 </head>
 <body>
