@@ -260,57 +260,10 @@ textarea{resize:vertical;min-height:44px;}
 
 .item-time{min-width:52px;padding-top:2px;}
 .item-time input{width:52px;padding:2px 5px;font-size:.56rem;border:1px solid var(--border);border-radius:2px;background:transparent;font-family:'Space Mono',monospace;color:var(--muted);text-align:center;}
-.del-btn:hover{
-  background:#fee2e2 !important;
-}
-
-@media (max-width: 768px){
-
-  body{
-    font-size:16px;
-  }
-
-  .ov-grid,
-  .day-body,
-  .planner-layout,
-  .flight-grid{
-    display:block !important;
-  }
-
-  .ov-right,
-  .schedule-col,
-  .add-panel,
-  .day-sidebar{
-    width:100% !important;
-    border:none !important;
-  }
-
-  .spots-grid{
-    grid-template-columns:1fr !important;
-  }
-
-  .stats-bar{
-    grid-template-columns:repeat(2,1fr) !important;
-  }
-
-  .hero-names{
-    font-size:2rem !important;
-  }
-
-  .btn{
-    min-height:44px;
-  }
-
-  input,
-  select,
-  textarea{
-    min-height:44px;
-    font-size:16px !important;
-  }
-
-}
-
+.del-btn:hover{background:#fee2e2 !important;border-color:#fca5a5 !important;color:var(--red) !important;}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
 <header style="position:sticky;top:0;z-index:300;background:#160804;border-bottom:2px solid #c0272d;box-shadow:0 2px 10px rgba(0,0,0,.6);">
@@ -324,8 +277,8 @@ textarea{resize:vertical;min-height:44px;}
     </nav>
     <div style="display:flex;align-items:center;gap:5px;padding-left:12px;border-left:1px solid rgba(255,255,255,.15);">
       <div class="save-dot" id="saveDot"></div>
-      <button class="btn btn-blue btn-sm" onclick="saveToDrive()">💾 Guardar</button>
-      <button class="btn btn-out btn-sm" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.25);" onclick="loadFromDrive()">📂 Carregar</button>
+      <button class="btn btn-blue btn-sm" onclick="saveToDrive()">☁️ Guardar</button>
+      <button class="btn btn-out btn-sm" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.25);" onclick="loadFromDrive()">☁️ Carregar</button>
       <button class="btn btn-out btn-sm" style="color:rgba(255,255,255,.5);border-color:rgba(255,255,255,.15);" onclick="exportTxt()">↓ .txt</button>
     </div>
   </div>
@@ -490,8 +443,107 @@ function persist(){try{localStorage.setItem('japan26v4',JSON.stringify({spots:sp
 function restore(){try{var raw=localStorage.getItem('japan26v4');if(!raw)return;var data=JSON.parse(raw);if(data.spots)spots=data.spots;if(data.checkedIn)checkedIn=new Set(data.checkedIn);if(data.checkedOut)checkedOut=new Set(data.checkedOut);if(data.days)data.days.forEach(function(s){var d=DAYS.find(function(x){return x.id===s.id;});if(d&&s.spots)d.spots=s.spots;});}catch(e){}}
 function getState(){return{version:4,savedAt:new Date().toISOString(),spots:spots,checkedIn:Array.from(checkedIn),checkedOut:Array.from(checkedOut),days:DAYS.map(function(d){return{id:d.id,spots:d.spots};})};}
 function applyState(data){if(!data||data.version!==4){showToast('&#10060; Versão inválida','err');return false;}if(data.spots)spots=data.spots;if(data.checkedIn)checkedIn=new Set(data.checkedIn);if(data.checkedOut)checkedOut=new Set(data.checkedOut);if(data.days)data.days.forEach(function(s){var d=DAYS.find(function(x){return x.id===s.id;});if(d&&s.spots)d.spots=s.spots;});persist();updateStats();renderTimeline();renderDaysList();if(activeDay)renderDayDetail(activeDay);return true;}
-function saveToDrive(){var j=JSON.stringify(getState(),null,2);var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download=DRIVE_FILE;a.click();setTimeout(function(){window.open(DRIVE_URL,'_blank');},400);showToast('&#128190; A descarregar... Pasta Drive aberta. Arrasta o ficheiro para lá.','ok');}
-function loadFromDrive(){window.open(DRIVE_URL,'_blank');setTimeout(function(){var inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){try{var d=JSON.parse(ev.target.result);if(applyState(d)){var s=d.savedAt?new Date(d.savedAt).toLocaleString('pt-PT'):'?';showToast('&#9989; Carregado! Guardado em: '+s,'ok');}}catch(err){showToast('&#10060; Erro: '+err.message,'err');}};r.readAsText(f);};inp.click();},1200);}
+// ── FIREBASE ──
+var firebaseDB = null;
+var DB_PATH = 'japan2026';
+
+function initFirebase() {
+  var cfg = {
+    apiKey: "AIzaSyCoyti751iLYAiW5amYOMowSlhnV_nxeCM",
+    authDomain: "japp2026-efffb.firebaseapp.com",
+    databaseURL: "https://japp2026-efffb-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "japp2026-efffb",
+    storageBucket: "japp2026-efffb.firebasestorage.app",
+    messagingSenderId: "777313435427",
+    appId: "1:777313435427:web:b195eeaf9ce4f1e92a5696"
+  };
+  try {
+    var app = firebase.initializeApp(cfg);
+    firebaseDB = firebase.database();
+    listenFirebase();
+    showToast('&#9729;&#65039; Ligado ao Firebase', 'ok');
+  } catch(e) {
+    showToast('&#10060; Firebase: ' + e.message, 'err');
+  }
+}
+
+function listenFirebase() {
+  if (!firebaseDB) return;
+  firebaseDB.ref(DB_PATH).on('value', function(snapshot) {
+    var data = snapshot.val();
+    if (!data) return;
+    // Only auto-apply if newer than local
+    var localSaved = localStorage.getItem('japan26v4_savedAt') || '0';
+    if (data.savedAt && data.savedAt > localSaved) {
+      applyState(data);
+      localStorage.setItem('japan26v4_savedAt', data.savedAt);
+      var who = data.savedBy || 'alguém';
+      var when = new Date(data.savedAt).toLocaleString('pt-PT');
+      showToast('&#9729;&#65039; Sincronizado — guardado por <strong>' + who + '</strong> em ' + when, 'ok');
+    }
+  });
+}
+
+function saveToDrive() {
+  var name = document.getElementById('fb-name') ? document.getElementById('fb-name').value.trim() : '';
+  if (!name) {
+    // Ask who is saving
+    showNameModal(function(n) { doSave(n); });
+  } else {
+    doSave(name);
+  }
+}
+
+function doSave(who) {
+  var state = getState();
+  state.savedBy = who || 'Tiago';
+  if (!firebaseDB) {
+    showToast('&#10060; Sem ligação ao Firebase', 'err');
+    return;
+  }
+  firebaseDB.ref(DB_PATH).set(state, function(err) {
+    if (err) {
+      showToast('&#10060; Erro ao guardar: ' + err.message, 'err');
+    } else {
+      localStorage.setItem('japan26v4_savedAt', state.savedAt);
+      persist();
+      showToast('&#9729;&#65039; Guardado por <strong>' + state.savedBy + '</strong>!', 'ok');
+    }
+  });
+}
+
+function loadFromDrive() {
+  if (!firebaseDB) { showToast('&#10060; Sem ligação ao Firebase', 'err'); return; }
+  firebaseDB.ref(DB_PATH).once('value', function(snapshot) {
+    var data = snapshot.val();
+    if (!data) { showToast('Sem dados no Firebase ainda', ''); return; }
+    if (applyState(data)) {
+      var who = data.savedBy || '?';
+      var when = new Date(data.savedAt).toLocaleString('pt-PT');
+      showToast('&#9729;&#65039; Carregado! Guardado por <strong>' + who + '</strong> em ' + when, 'ok');
+    }
+  });
+}
+
+var _saveCb = null;
+function showNameModal(cb) {
+  _saveCb = cb;
+  var overlay = document.createElement('div');
+  overlay.id = 'nameOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = '<div style="background:#fff;border-radius:6px;padding:24px;min-width:280px;font-family:Space Mono,monospace;">'
+    + '<div style="font-size:.8rem;margin-bottom:14px;font-weight:700;color:#1a0a02;">Quem est\u00e1 a guardar?</div>'
+    + '<div style="display:flex;gap:10px;">'
+    + '<button onclick="pickName(&quot;Tiago&quot;)" style="flex:1;padding:12px;background:#c0272d;color:white;border:none;border-radius:3px;cursor:pointer;font-family:Space Mono,monospace;font-size:.75rem;font-weight:700;letter-spacing:1px;">TIAGO</button>'
+    + '<button onclick="pickName(&quot;Rita&quot;)" style="flex:1;padding:12px;background:#7b3fa0;color:white;border:none;border-radius:3px;cursor:pointer;font-family:Space Mono,monospace;font-size:.75rem;font-weight:700;letter-spacing:1px;">RITA</button>'
+    + '</div></div>';
+  document.body.appendChild(overlay);
+}
+function pickName(name) {
+  var ov = document.getElementById('nameOverlay');
+  if (ov) ov.remove();
+  if (_saveCb) { _saveCb(name); _saveCb = null; }
+}
 function showView(name,btn){document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('active');});document.getElementById('view-'+name).classList.add('active');if(btn)btn.classList.add('active');if(name==='overview'){renderTimeline();updateStats();}if(name==='planner')renderDaysList();if(name==='spots')renderSpotsGrid(currentFilter);if(name==='tickets')renderTickets();if(name==='maps')renderMaps();}
 function updateStats(){var e=document.getElementById('st-spots');if(e)e.textContent=spots.length;e=document.getElementById('st-in');if(e)e.textContent=checkedIn.size;}
 function renderTimeline(){var c=document.getElementById('timelineList');if(!c)return;var h='';DAYS.forEach(function(d){var col=cc(d.city);var cnt=d.spots?d.spots.length:0;h+='<div class="tl-item" onclick="goDay('+d.id+')">'+'<div class="tl-num">D'+d.id+'</div>'+'<div class="tl-dot-col"><div class="tl-dot" style="border-color:'+col+';background:'+(cnt>0?col:'white')+'"></div><div class="tl-vl"></div></div>'+'<div class="tl-info"><div class="tl-city" style="color:'+col+'">'+ce(d.city)+' '+d.city+'</div><div class="tl-desc">'+d.desc+'</div><div class="tl-date">'+d.day+' &middot; '+d.date+'</div></div>'+'<div class="tl-cnt">'+cnt+'</div></div>';});c.innerHTML=h;}
@@ -599,7 +651,7 @@ function saveNewSpot(){var name=document.getElementById('mn-name').value.trim();
 function renderTickets(){var c=document.getElementById('ticketsContainer');if(!c)return;var urgent=TICKETS.filter(function(t){return t.status==='urgent'||t.status==='book';});var rest=TICKETS.filter(function(t){return t.status!=='urgent'&&t.status!=='book';});var all=urgent.concat(rest);var uCnt=TICKETS.filter(function(t){return t.status==='urgent';}).length;var h='<div class="tk-panel"><div class="tk-hdr"><div class="tk-hdr-t">&#127915; Bilhetes &amp; Reservas</div><span class="tk-cnt">'+uCnt+' urgentes &middot; '+TICKETS.length+' total</span></div><div class="tk-list">';all.forEach(function(t){var lh='';t.links.forEach(function(l){lh+=l.buy?'<a href="'+l.url+'" target="_blank" class="tki-buy">'+l.label+'</a>':'<a href="'+l.url+'" target="_blank" class="tki-link">'+l.label+'</a>';});h+='<div class="tki '+t.status+'"><div class="tki-icon">'+t.icon+'</div><div><div class="tki-name">'+t.name+' <span class="tki-sub">'+t.day+' &middot; '+t.city+'</span></div><div class="tki-detail">'+t.detail+'</div><div class="tki-price">'+t.price+'</div><div class="tki-links">'+lh+'</div></div></div>';});h+='</div></div>';c.innerHTML=h;}
 function renderMaps(){var c=document.getElementById('dynamicRoutes');if(!c)return;var dws=DAYS.filter(function(d){return d.spots&&d.spots.length>0;});if(dws.length===0){c.innerHTML='<div style="background:var(--sur2);border:1px dashed var(--border);border-radius:4px;padding:14px 18px;font-size:.75rem;color:var(--muted);margin-bottom:16px">Adiciona locais ao Detalhe Di&aacute;rio para gerar percursos autom&aacute;ticos aqui.</div>';} else{var h='<div style="font-family:Space Mono,monospace;font-size:.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Percursos do teu itin&eacute;rario</div>';dws.forEach(function(d){var col=cc(d.city);var sorted=d.spots.slice().sort(function(a,b){return(a.time||'00:00').localeCompare(b.time||'00:00');});var tkCnt=sorted.filter(function(s){return s.ticket;}).length;var ms=sorted.filter(function(s){return s.link&&s.link.indexOf('maps.google')>-1;}).map(function(s){return s.link.split('?q=')[1]||s.name;});var mu=ms.length>=2?'https://maps.google.com/maps/dir/'+ms.slice(0,8).join('/'):(ms[0]?'https://maps.google.com/?q='+ms[0]:'#');h+='<div class="map-section" style="border-left:4px solid '+col+'"><div class="map-sec-hdr"><div class="map-sec-title">'+ce(d.city)+' Dia '+d.id+' \u2014 '+d.city+' <span style="font-size:.7rem;opacity:.7">'+d.day+' '+d.date+'</span></div><span style="font-family:Space Mono,monospace;font-size:.52rem;background:rgba(255,255,255,.15);color:white;padding:2px 8px;border-radius:2px">'+sorted.length+' locais</span>'+(ms.length>=2?'<a href="'+mu+'" target="_blank" class="map-btn">&#8599; Rota Maps</a>':'')+'</div><div class="map-steps">';sorted.forEach(function(s){h+='<div class="map-step"><div class="ms-time">'+(s.time||'--:--')+'</div><div class="ms-content"><strong>'+s.name+'</strong>'+(s.ticket?' <span style="font-family:Space Mono,monospace;font-size:.52rem;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:1px 5px;border-radius:2px">&#127915; Bilhete</span>':'')+(s.desc?'<br><span class="ms-note">'+s.desc.slice(0,80)+(s.desc.length>80?'...':'')+'</span>':'')+(s.tip?'<br><span style="color:var(--gold);font-size:.65rem">&#128161; '+s.tip+'</span>':'')+'</div>'+(s.link?'<a href="'+s.link+'" target="_blank" class="ms-link">'+(s.link.indexOf('instagram')>-1?'&#8599; IG':'&#8599; Maps')+'</a>':'')+'</div>';});if(tkCnt>0)h+='<div style="background:#fff9f9;border-top:1px dashed #fca5a5;padding:8px 0 0;margin-top:4px;font-size:.7rem;color:#991b1b;font-family:Space Mono,monospace">&#127915; '+tkCnt+' bilhete(s) \u2014 ver aba Bilhetes</div>';h+='</div></div>';});c.innerHTML=h;}document.getElementById('fixedRoutes').innerHTML=FIXED_ROUTES_HTML;}
 function exportTxt(){var txt='TIAGO & RITA 2026 | JAP\u00c3O\n'+'='.repeat(50)+'\n\n';DAYS.forEach(function(d){txt+='DIA '+d.id+' \u00b7 '+d.day+' '+d.date+' \u2014 '+d.city+'\n'+d.desc+'\n'+d.pb+'\n'+'-'.repeat(40)+'\n';(d.spots||[]).forEach(function(s){txt+='  '+(s.time||'--:--')+' | '+s.name+(s.ticket?' [BILHETE]':'')+(s.pinned?' [FIXO]':'')+'\n';if(s.desc)txt+='       '+s.desc+'\n';});txt+='\n';});var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));a.download='japao2026-tiago-rita.txt';a.click();}
-window.addEventListener('DOMContentLoaded',function(){restore();updateStats();renderTimeline();renderDaysList();});
+window.addEventListener('DOMContentLoaded',function(){restore();updateStats();renderTimeline();renderDaysList();initFirebase();});
 
 // ── DATA ──
 const DAYS = [
