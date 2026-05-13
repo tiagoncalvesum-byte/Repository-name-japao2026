@@ -471,6 +471,32 @@ var firebaseDB=null,DB_PATH='japan2026';
 function initFirebase(){var cfg={apiKey:"AIzaSyCoyti751iLYAiW5amYOMowSlhnV_nxeCM",authDomain:"japp2026-efffb.firebaseapp.com",databaseURL:"https://japp2026-efffb-default-rtdb.europe-west1.firebasedatabase.app",projectId:"japp2026-efffb",storageBucket:"japp2026-efffb.firebasestorage.app",messagingSenderId:"777313435427",appId:"1:777313435427:web:b195eeaf9ce4f1e92a5696"};try{firebase.initializeApp(cfg);firebaseDB=firebase.database();listenFirebase();showToast('☁️ Ligado ao Firebase','ok');}catch(e){showToast('❌ Firebase: '+e.message,'err');}}
 function listenFirebase(){if(!firebaseDB)return;firebaseDB.ref(DB_PATH).on('value',function(snapshot){var data=snapshot.val();if(!data)return;var localSaved=localStorage.getItem('japan26v4_savedAt')||'0';if(data.savedAt&&data.savedAt>localSaved){applyState(data);localStorage.setItem('japan26v4_savedAt',data.savedAt);showToast('☁️ Sincronizado — guardado por <strong>'+(data.savedBy||'alguém')+'</strong> em '+new Date(data.savedAt).toLocaleString('pt-PT'),'ok');}});}
 function saveToDrive(){showNameModal(function(n){doSave(n);});}
+function saveDayOnly(dayId, who) {
+  if (!firebaseDB) { showToast('❌ Sem ligação ao Firebase', 'err'); return; }
+  // Fetch current Firebase state first, then only update the specific day
+  firebaseDB.ref(DB_PATH).once('value', function(snapshot) {
+    var current = snapshot.val() || getState();
+    if (!current.days) current = getState();
+    // Update only this day
+    var d = DAYS.find(function(x) { return x.id === dayId; });
+    if (!d) return;
+    current.days = current.days.map(function(s) {
+      return s.id === dayId ? { id: d.id, spots: d.spots } : s;
+    });
+    current.savedAt = new Date().toISOString();
+    current.savedBy = who || 'Tiago';
+    firebaseDB.ref(DB_PATH).set(current, function(err) {
+      if (err) {
+        showToast('❌ Erro: ' + err.message, 'err');
+      } else {
+        localStorage.setItem('japan26v4_savedAt', current.savedAt);
+        persist();
+        showToast('☁️ Dia ' + dayId + ' guardado por <strong>' + current.savedBy + '</strong>!', 'ok');
+      }
+    });
+  });
+}
+
 function doSave(who){var state=getState();state.savedBy=who||'Tiago';if(!firebaseDB){showToast('❌ Sem ligação ao Firebase','err');return;}firebaseDB.ref(DB_PATH).set(state,function(err){if(err){showToast('❌ Erro ao guardar: '+err.message,'err');}else{localStorage.setItem('japan26v4_savedAt',state.savedAt);persist();showToast('☁️ Guardado por <strong>'+state.savedBy+'</strong>!','ok');}});}
 function loadFromDrive(){if(!firebaseDB){showToast('❌ Sem ligação ao Firebase','err');return;}firebaseDB.ref(DB_PATH).once('value',function(snapshot){var data=snapshot.val();if(!data){showToast('Sem dados no Firebase ainda','');return;}if(applyState(data)){showToast('☁️ Carregado! Guardado por <strong>'+(data.savedBy||'?')+'</strong> em '+new Date(data.savedAt).toLocaleString('pt-PT'),'ok');}});}
 var _saveCb=null;
@@ -523,7 +549,7 @@ function renderDayDetail(id){
   h+='<div style="color:#aaa;font-family:Space Mono,monospace;font-size:.65rem;margin-top:3px">'+d.desc+'</div>';
   h+='<div class="day-meta"><span class="day-chip">'+d.spots.length+' locais</span>';
   if(tkCnt>0)h+='<span class="day-chip" style="color:#fca5a5" onclick="showView(\'tickets\',document.querySelectorAll(\'.nb\')[3])">🎟 '+tkCnt+' bilhete(s)</span>';
-  h+='<span class="day-chip" onclick="showView(\'maps\',document.querySelectorAll(\'.nb\')[4])">↗ Percurso</span></div>';
+  h+='<span class="day-chip" onclick="showView(\'maps\',document.querySelectorAll(\'.nb\')[4])">↗ Percurso</span></div>+'<span class=\"day-chip\" style=\"color:#4ade80;border-color:rgba(74,222,128,.3);\" onclick=\"showNameModal(function(n){saveDayOnly('+id+',n)})\">☁️ Guardar dia</span>'+'</div>';
   h+='<div class="pb-note">'+d.pb+'</div></div>';
   h+='<div class="day-body"><div class="schedule-col">';
   h+='<div class="sched-top"><span class="sched-label">Programação</span><div class="sched-btns">';
